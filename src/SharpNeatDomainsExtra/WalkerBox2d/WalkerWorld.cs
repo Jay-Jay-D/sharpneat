@@ -1,7 +1,7 @@
 ﻿/* ***************************************************************************
  * This file is part of SharpNEAT - Evolution of Neural Networks.
  * 
- * Copyright 2004-2006, 2009-2012 Colin Green (sharpneat@gmail.com)
+ * Copyright 2004-2016 Colin Green (sharpneat@gmail.com)
  *
  * SharpNEAT is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 using Box2DX.Collision;
 using Box2DX.Common;
 using Box2DX.Dynamics;
+using Redzen.Numerics;
 using SharpNeat.DomainsExtra.Box2D;
 using SysMath = System.Math;
 
@@ -30,6 +31,8 @@ namespace SharpNeat.DomainsExtra.WalkerBox2d
     public class WalkerWorld : SimulationWorld
     {
         const float __lowerLegLength = 0.5f;
+
+        XorShiftRandom _rng;
 
         float _trackLength;
         float _trackLengthHalf;
@@ -48,15 +51,23 @@ namespace SharpNeat.DomainsExtra.WalkerBox2d
         /// <summary>
         /// Defautl constrcutor.
         /// </summary>
-        public WalkerWorld() : this(300)
+        public WalkerWorld() : this(new XorShiftRandom(), 300)
+        {}
+
+        /// <summary>
+        /// Defautl constrcutor.
+        /// </summary>
+        public WalkerWorld(XorShiftRandom rng) : this(rng, 300)
         {}
 
         /// <summary>
         /// Constructor accepting a trackLength parameter (length of the track that the walker is walking along).
         /// </summary>
         /// <param name="trackLength"></param>
-        public WalkerWorld(float trackLength)
+        /// <param name="rng">Random number generator.</param>
+        public WalkerWorld(XorShiftRandom rng, float trackLength)
         {
+            _rng = rng;
             _trackLength = trackLength;
             _trackLengthHalf = trackLength * 0.5f;
         }
@@ -119,15 +130,23 @@ namespace SharpNeat.DomainsExtra.WalkerBox2d
 			// Add the ground shape to the ground body.
             groundBody.CreateShape(groundShapeDef);
 
-        // ==== Define walker torso.
+            // Add some small mounds/bumps to the ground.
+            for (float x = -1f; x < 40f; x += 0.4f + ((_rng.NextFloat()-0.5f) * 0.15f)) {
+                WalkerWorldUtils.CreateMound(_world, x, 0f, _simParams._defaultFriction, _simParams._defaultRestitution);
+            }
+
+            // ==== Define walker torso.
+            float walkerX = 0f;
+            float walkerY = 1.30f;// + ((float)_rng.NextDouble() * 0.1f);
+
             BodyDef torsoBodyDef = new BodyDef();
-            torsoBodyDef.Position.Set(0f, 1.45f);
+            torsoBodyDef.Position.Set(walkerX, walkerY);
             torsoBodyDef.IsBullet = true;
 
             // Create walker torso.
             _torsoBody = _world.CreateBody(torsoBodyDef);
             PolygonDef torsoShapeDef = new PolygonDef();
-            torsoShapeDef.SetAsBox(0.10f, 0.45f);
+            torsoShapeDef.SetAsBox(0.10f, 0.30f);
             torsoShapeDef.Friction = _simParams._defaultFriction;
             torsoShapeDef.Restitution = 0f;
             torsoShapeDef.Density = 2f;
@@ -144,8 +163,8 @@ namespace SharpNeat.DomainsExtra.WalkerBox2d
 
             // Other re-usable stuff .
             const float legRadius = 0.05f;	// Half the thickness of the leg
-            Vec2 upperLegPosBase = new Vec2(0f, 1.05f);
-            Vec2 lowerLegPosBase = new Vec2(0f, 0.55f);
+            Vec2 upperLegPosBase = new Vec2(walkerX, walkerY - 0.25f);
+            Vec2 lowerLegPosBase = new Vec2(walkerX, walkerY - 0.75f);
 
         // ===== Create left leg.
             // Upper leg.

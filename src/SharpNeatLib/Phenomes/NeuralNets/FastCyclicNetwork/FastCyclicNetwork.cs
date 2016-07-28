@@ -1,7 +1,7 @@
 /* ***************************************************************************
  * This file is part of SharpNEAT - Evolution of Neural Networks.
  * 
- * Copyright 2004-2006, 2009-2010 Colin Green (sharpneat@gmail.com)
+ * Copyright 2004-2016 Colin Green (sharpneat@gmail.com)
  *
  * SharpNEAT is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -185,7 +185,7 @@ namespace SharpNeat.Phenomes.NeuralNets
                     
                     // Take the opportunity to reset the pre-activation signal array in preperation for the next 
                     // activation loop.
-                    _preActivationArray[j] = 0.0F;
+                    _preActivationArray[j] = 0.0;
                 }
             }
         }

@@ -1,7 +1,7 @@
 ﻿/* ***************************************************************************
  * This file is part of SharpNEAT - Evolution of Neural Networks.
  * 
- * Copyright 2004-2006, 2009-2012 Colin Green (sharpneat@gmail.com)
+ * Copyright 2004-2016 Colin Green (sharpneat@gmail.com)
  *
  * SharpNEAT is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -85,7 +85,7 @@ namespace SharpNeat.DomainsExtra.WalkerBox2d
         /// </summary>
         public int InputCount
         {
-            get { return 13; }
+            get { return 10; }
         }
 
         /// <summary>
@@ -139,7 +139,17 @@ namespace SharpNeat.DomainsExtra.WalkerBox2d
 
             _eaParams = new NeatEvolutionAlgorithmParameters();
             _eaParams.SpecieCount = _specieCount;
+            _eaParams.SelectionProportion = 0.5;
+            _eaParams.ElitismProportion = 0.5;
+            _eaParams.OffspringAsexualProportion = 0.95;
+            _eaParams.OffspringSexualProportion = 0.05;
+            _eaParams.InterspeciesMatingProportion = 0.00;
+
             _neatGenomeParams = new NeatGenomeParameters();
+            _neatGenomeParams.AddConnectionMutationProbability = 0.1;
+            _neatGenomeParams.AddNodeMutationProbability = 0.01;
+            _neatGenomeParams.ConnectionWeightMutationProbability = 0.89;
+            _neatGenomeParams.InitialInterconnectionsProportion = 0.05;
         }
 
         /// <summary>
@@ -236,7 +246,7 @@ namespace SharpNeat.DomainsExtra.WalkerBox2d
             // that were in the population in previous generations (elite genomes). This is determiend by examining each genome's evaluation info object.
             IGenomeListEvaluator<NeatGenome> selectiveEvaluator = new SelectiveGenomeListEvaluator<NeatGenome>(
                                                                                     innerEvaluator,
-                                                                                    SelectiveGenomeListEvaluator<NeatGenome>.CreatePredicate_OnceOnly());
+                                                                                    SelectiveGenomeListEvaluator<NeatGenome>.CreatePredicate_PeriodicReevaluation(5));
             // Initialize the evolution algorithm.
             ea.Initialize(selectiveEvaluator, genomeFactory, genomeList);
 

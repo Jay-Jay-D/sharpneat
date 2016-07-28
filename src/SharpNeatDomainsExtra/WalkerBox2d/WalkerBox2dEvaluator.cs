@@ -1,7 +1,7 @@
 /* ***************************************************************************
  * This file is part of SharpNEAT - Evolution of Neural Networks.
  * 
- * Copyright 2004-2006, 2009-2012 Colin Green (sharpneat@gmail.com)
+ * Copyright 2004-2016 Colin Green (sharpneat@gmail.com)
  *
  * SharpNEAT is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +19,8 @@
 using System;
 using SharpNeat.Core;
 using SharpNeat.Phenomes;
+using Redzen.Numerics;
+using Box2DX.Common;
 
 namespace SharpNeat.DomainsExtra.WalkerBox2d
 {
@@ -29,6 +31,7 @@ namespace SharpNeat.DomainsExtra.WalkerBox2d
     {
         #region Instance Fields
 
+        XorShiftRandom _rng;
 		int	_maxTimesteps;
 
         // Evaluator state.
@@ -42,7 +45,7 @@ namespace SharpNeat.DomainsExtra.WalkerBox2d
         /// <summary>
         /// Construct evaluator with default task arguments/variables.
         /// </summary>
-		public WalkerBox2dEvaluator() : this(1800)
+		public WalkerBox2dEvaluator() : this(600)
 		{}
 
         /// <summary>
@@ -50,7 +53,8 @@ namespace SharpNeat.DomainsExtra.WalkerBox2d
         /// </summary>
 		public WalkerBox2dEvaluator(int maxTimesteps)
 		{
-			_maxTimesteps = maxTimesteps;
+            _rng = new XorShiftRandom();
+            _maxTimesteps = maxTimesteps;
 		}
 
 		#endregion
@@ -80,42 +84,77 @@ namespace SharpNeat.DomainsExtra.WalkerBox2d
         /// </summary>
         public FitnessInfo Evaluate(IBlackBox box)
         {
+            const int trialCount = 5;
+            double totalX = 0.0;
+
+            for(int i=0; i<trialCount; i++) {
+                totalX += EvaluateInner(box);
+            }
+
+            // Track number of evaluations.
+            _evalCount++;
+
+            double meanX = totalX / trialCount;
+            double fitness = meanX * meanX;
+            return new FitnessInfo(fitness, meanX);
+        }
+
+        #endregion
+
+        #region Private Methods
+
+        private double EvaluateInner(IBlackBox box)
+        {
+            const double angleLimit = System.Math.PI / 3.0;
+
             // Init Box2D world.
-            WalkerWorld world = new WalkerWorld();
+            WalkerWorld world = new WalkerWorld(_rng);
             world.InitSimulationWorld();
 
             // Create an interface onto the walker.
             WalkerInterface walkerIface = world.CreateWalkerInterface();
 
             // Create a neural net controller for the walker.
-            NeuralNetController walkerController = new NeuralNetController(walkerIface, box);
+            NeuralNetController walkerController = new NeuralNetController(walkerIface, box, world.SimulationParameters._frameRate);
+
+            Vec2 hipPos = walkerIface.LeftLegIFace.HipJointPosition;
+            double torsoYMin = hipPos.Y;
+            double torsoYMax = hipPos.Y;
 
             // Run the simulation.
             LegInterface leftLeg = walkerIface.LeftLegIFace;
             LegInterface rightLeg = walkerIface.RightLegIFace;
-            double angleLimit = Math.PI * 0.5;
-            double totalAppliedTorque = 0.0;
+            //double totalAppliedTorque = 0.0;
             int timestep = 0;
             for(; timestep < _maxTimesteps; timestep++)
             {
                 // Simulate one timestep.
                 world.Step();
                 walkerController.Step();
-                totalAppliedTorque += walkerIface.TotalAppliedTorque;
+                //totalAppliedTorque += walkerIface.TotalAppliedTorque;
 
-                // Test for breaking conditions.
-                if(    walkerIface.TorsoPosition.X > 290f || walkerIface.TorsoPosition.Y < 1.30f 
-                    || (leftLeg.FootHeight > 0.11f && rightLeg.FootHeight > 0.11f)
-                    || Math.Abs(leftLeg.HipJointAngle) > angleLimit || Math.Abs(leftLeg.KneeJointAngle) > angleLimit
-                    || Math.Abs(rightLeg.HipJointAngle) > angleLimit || Math.Abs(rightLeg.KneeJointAngle) > angleLimit)
+                // Track hip joint height and min/max extents.
+                hipPos = walkerIface.LeftLegIFace.HipJointPosition;
+                if(hipPos.Y < torsoYMin) {
+                    torsoYMin = hipPos.Y;
+                }
+                else if(hipPos.Y > torsoYMax) {
+                    torsoYMax = hipPos.Y;
+                }
+
+                double heightRange = torsoYMax - torsoYMin;
+
+                // Test for stopping conditions.
+                if (hipPos.X < -0.7 || hipPos.X > 150f  || heightRange > 0.20
+                     || System.Math.Abs(leftLeg.HipJointAngle) > angleLimit || System.Math.Abs(leftLeg.KneeJointAngle) > angleLimit
+                    || System.Math.Abs(rightLeg.HipJointAngle) > angleLimit || System.Math.Abs(rightLeg.KneeJointAngle) > angleLimit)
                 {   // Stop simulation.
                     break;
                 }
             }
 
-            _evalCount++;
-            double fitness = Math.Max(0.0, walkerIface.TorsoPosition.X);
-            return new FitnessInfo(fitness, walkerIface.TorsoPosition.X);
+            // Final fitness calcs / adjustments.            
+            return System.Math.Max(hipPos.X, 0.0);
         }
 
         /// <summary>
